@@ -1,0 +1,155 @@
+﻿@using TXTextControl.Web.MVC
+@using TXTextControl.Web
+
+@Html.TXTextControl().TextControl(settings =>
+{
+    settings.Dock = DockStyle.Window;
+}).Render()
+
+<style>
+    .overlay {
+        position: absolute;
+        font-family: Arial;
+        font-size: 8pt;
+        min-width: 140px;
+    }
+</style>
+
+<script>  
+
+    TXTextControl.addEventListener("ribbonTabsLoaded", function (e) {
+
+        $.get("/RibbonExtensions/FormsDropDownRibbonGroup.html", function (data) {
+            $("#ribbonGroupMergeField").after(data);
+
+            $("#btnInsertDropDownForm").click(function () {
+
+                // create a new ApplicationField of type dropdown
+                var comboBox = new TXTextControl.ApplicationField();
+                comboBox.typeName = "FORMDROPDOWN";
+                comboBox.parameters = ["w:name w:val=\"Dropdown1\"",
+                    "w:enabled w:val=\"true\"",
+                    "w:calcOnExit w:val=\"false\"",
+                    "w:listEntry w:val=\"Test1\"",
+                    "w:listEntry w:val=\"Test2\""];
+
+                comboBox.text = "ComboBox";
+                comboBox.editable = false;
+                comboBox.doubledInputPosition = true;
+
+                // add the field
+                TXTextControl.addTextField(comboBox);
+            });
+
+        });
+
+    });
+
+    (function () {
+        var _txtViewLoc = { x: 0, y: 0 };
+        var _divOvr;
+        var _textView;
+        var _container;
+        var _zoom = 1.0;
+        var _currentField;
+
+        function drawOverlay() {
+
+            _divOvr = document.getElementById("divOvr");
+
+            var sParams = "";
+
+            // create the options based on the drop down items
+            for (let param of _currentField.parameters) {
+                if (param.startsWith("w:listEntry")) {
+                    var arrStr = param.split(/["]/);
+                    sParams += "<option>" + arrStr[1] + "</option>";
+                }
+            }
+
+            // create a new html select object
+            if (!_divOvr) {
+                _divOvr = document.createElement("select");
+                _divOvr.className = "overlay";
+                _divOvr.id = "divOvr";
+                _divOvr.innerHTML = sParams;
+                _container.appendChild(_divOvr);
+            }
+
+            // retrieve the field location in the document
+            var fldPos = _currentField.bounds.location;
+
+            // and calculate the offset location and zoom factor
+            var x = _textView.offsetLeft + (fldPos.x - _txtViewLoc.x) * _zoom;
+            var y = _textView.offsetTop + (fldPos.y - _txtViewLoc.y) * _zoom;
+
+            // set position and size
+            _divOvr.style.fontSize = (8 * _zoom) + "pt";
+            _divOvr.style.zIndex = _textView.style.zIndex + 10;
+            _divOvr.style.left = x + "px";
+            _divOvr.style.width = (_currentField.bounds.size.width * _zoom) + "px";
+            _divOvr.style.minHeight = (_currentField.bounds.size.height * _zoom) + "px";
+            _divOvr.style.top = y + "px";
+            
+            // add change event to change text of the field
+            // when an option has been selected
+            $('#divOvr').change(function () {
+                var val = $("#divOvr option:selected").val();
+                _currentField.text = val;
+                removeElement();
+            });
+
+            $('#divOvr').focus(function () {
+                this.selectedIndex = -1;
+                this.focus();
+            });
+
+            _divOvr.focus();
+        }
+
+        function textFieldEnteredHandler(e) {
+            TXTextControl.getTextFields(function (e) {
+                _currentField = e[0];
+                drawOverlay();
+            }, true);
+        }
+
+        function textViewLocationChangedHandler(e) {
+            _txtViewLoc = e.location;
+            if (!_divOvr) return;
+            drawOverlay()
+        }
+
+        function zoomFactorChangedHandler(e) {
+            _zoom = e.zoomFactor / 100.0;
+            if (!_divOvr) return;
+            drawOverlay();
+        }
+
+        function textFieldLeftHandler(e) {
+            removeElement();
+        }
+
+        function removeElement() {
+            _currentField = null;
+            if (_divOvr) {
+                _container.removeChild(_divOvr);
+                _divOvr = null;
+            }
+        }
+
+        function window_load() {
+            _textView = document.getElementById("mainCanvas");
+            _container = document.getElementById("txTemplateDesignerContainer");
+
+            TXTextControl.addEventListener("textViewLocationChanged", textViewLocationChangedHandler);
+            TXTextControl.addEventListener("zoomFactorChanged", zoomFactorChangedHandler);
+            TXTextControl.addEventListener("textFieldLeft", textFieldLeftHandler);
+            TXTextControl.addEventListener("textFieldEntered", textFieldEnteredHandler);
+            TXTextControl.addEventListener("textFieldClicked", textFieldEnteredHandler);
+        }
+
+        window.addEventListener("load", window_load);
+    })();
+
+</script>
